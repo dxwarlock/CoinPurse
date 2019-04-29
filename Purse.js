@@ -35,6 +35,9 @@ on('chat:message', function (msg) {
                 oC.setWithWorker('current', value);
             });
         }
+        else {
+            return;
+        }
         //SET CHAT SPENT VARIABLE (REVERSE COIN ORDER TO DESCENDING VALUES)
         var reverseSpent = SpendValue.reverse();
         var displaySpent = eval("(" + '{' + reverseSpent + '}' + ")");
