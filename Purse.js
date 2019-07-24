@@ -14,7 +14,7 @@ on('chat:message', function (msg) {
             sendChat('Coin Purse', "Not All Coins Set");
             return;
         }
-        var remaining;
+        var newBalance;
         var amountSpent = '';
         var transactiontype = '';
         var msgFormula = msg.content.split(/\s+/);
@@ -25,18 +25,26 @@ on('chat:message', function (msg) {
         //SPEND MONEY
         if (msgFormula[1] == "Spend") {
             transactiontype = "Spent:"
-            remaining = spendMoney(spend, purse);
-            if (remaining == undefined) {
+            newBalance = spendMoney(spend, purse);
+            if (newBalance == undefined) {
                 sendChat('Coin Purse', "You do not have that much....");
                 return;
             }
-            _.each(remaining, function (value, key) {
+            _.each(newBalance, function (value, key) {
                 var oC = findObjs({ name: key, _type: "attribute", characterid: cWho.id }, { caseInsensitive: true })[0];
                 oC.setWithWorker('current', value);
             });
         }
         else {
-            return;
+            _.each(spend, function (value, key) {
+                transactiontype = "Gained:"
+                var oC = findObjs({ name: key, _type: "attribute", characterid: cWho.id }, { caseInsensitive: true })[0];
+                var currentCoins = parseInt(oC.get("current"), 10);
+                var newCoins = parseInt(value, 10);
+                var total = parseInt(currentCoins + newCoins, 10);
+                oC.setWithWorker('current', total);
+                newBalance = GetMoney(oCP, oSP, oGP, oPP);
+            });
         }
         //SET CHAT SPENT VARIABLE (REVERSE COIN ORDER TO DESCENDING VALUES)
         var reverseSpent = SpendValue.reverse();
@@ -45,27 +53,16 @@ on('chat:message', function (msg) {
         for (var key in displaySpent) {
             if (displaySpent[key] != 0) amountSpent = amountSpent + " " + displaySpent[key] + "" + key;
         }
-        /*TO DO---FIGURE OUT COINS ACTUALLY SPENT VS AMOUNT SPENT
-        var coinsTaken = CoinsSpent(purse, remaining);
-        ------------*/
-        var coinSum = "Purse: " + remaining.pp + "PP " + remaining.gp + "GP " + remaining.sp + "SP " + remaining.cp + "CP";
-        var chatmsg = "&{template:pf_block}{{color=darkgrey}}{{name=" + coinSum + "}}{{description=" + transactiontype + " " + amountSpent.toUpperCase() + "}}";
+        var coinSum = "Purse: " + newBalance.pp + "PP " + newBalance.gp + "GP " + newBalance.sp + "SP " + newBalance.cp + "CP";
+        var purseValue = "Gold Value: "+ Math.round((newBalance.pp*10 + newBalance.gp + newBalance.sp/10 + newBalance.cp/100) * 100) / 100;
+        var chatmsg = "&{template:pf_block}{{color=darkgrey}}{{name=" + coinSum + "}}{{description="+purseValue+" }}{{shortdesc=" + transactiontype + " " + amountSpent.toUpperCase() + "}}";
+        //SEND TO CHAT
         sendChat('Coin Purse', "/w " + msg.who + " " + chatmsg);
         if (msg.who !== "GM") {
-            sendChat('Coin Purse', "/w GM " + chatmsg);
+            sendChat('Coin Purse '+msg.who, "/w GM " + chatmsg);
         }
     }
 });
-/*---ROLL AS CHARACTER NAME FUNCTION---*/
-function RollRight(whoPC) {
-    var character = findObjs({ type: 'character', controlledby: whoPC })[0];
-    if (character == undefined) {
-        sendChat("system", "/direct No character found for: " + whoPC + ", please set!");
-    }
-    else {
-        return character;
-    }
-}
 /*---GET CHARACTER MONEY FUNCTION---*/
 function GetMoney(oPP, oGP, oSP, oCP) {
     let coins = {};
@@ -104,22 +101,18 @@ const spendMoney = (spend, purse) => {
         return remainPurse;
     }
 };
-/*---ADD MONEY FUNCTION---*/
-function AddMoney(cWho, type, amount) {
-    var oC = findObjs({ name: type, _type: "attribute", characterid: cWho.id }, { caseInsensitive: true })[0];
-    var currentCoins = parseInt(oC.get("current"), 10);
-    var newCoins = parseInt(amount, 10);
-    var total = parseInt(currentCoins + newCoins, 10);
-    oC.setWithWorker('current', total);
-}
-/*TO DO----
-function CoinsSpent(a, b) {
-    var diff = {"cp":0,"sp":0,"gp":0,"pp":0};
-    for(var key in a) {
-        if(a[key] !== b[key]) {
-            diff[key] = a[key]-b[key];
-        }
+/*------------------
+ROLL RIGHT NAME
+------------------*/
+function RollRight(whoPC) {
+    var character1 = findObjs({ type: 'character', controlledby: whoPC });
+    var SimpleObj = (o)=>JSON.parse(JSON.stringify(o));
+    var PCsheet = character1.filter(c=>SimpleObj(c).gmnotes==='');
+    var character = PCsheet[0];
+    if (character == undefined) {
+        sendChat("system", "/direct No character found for: " + whoPC + ", please set!");
     }
-    return diff;
-}
-*/
+    else {
+        return character;
+    }
+};
